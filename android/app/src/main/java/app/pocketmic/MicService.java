@@ -18,7 +18,10 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import javax.net.ssl.*;
 
 public final class MicService extends Service {
@@ -29,6 +32,7 @@ public final class MicService extends Service {
     private volatile boolean stopping;
     private static volatile MicService owner;
     private volatile Socket socket;
+    private volatile AudioRecord activeRecorder;
     private Thread worker;
     private PowerManager.WakeLock wakeLock;
     private WifiManager.WifiLock wifiLock;
@@ -117,11 +121,14 @@ public final class MicService extends Service {
         if (minimum <= 0) throw new FatalConnection("手机不支持 48 kHz 录音。");
         AudioRecord recorder = new AudioRecord(MediaRecorder.AudioSource.VOICE_RECOGNITION, Wire.RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, Math.max(minimum, Wire.AUDIO_BYTES * 4));
         if (recorder.getState() != AudioRecord.STATE_INITIALIZED) { recorder.release(); throw new FatalConnection("麦克风不可用，请关闭占用麦克风的其他应用。"); }
+        activeRecorder = recorder;
         for (AudioDeviceInfo info : getSystemService(AudioManager.class).getDevices(AudioManager.GET_DEVICES_INPUTS)) {
             if (info.getType() == AudioDeviceInfo.TYPE_BUILTIN_MIC) { recorder.setPreferredDevice(info); break; }
         }
         NoiseSuppressor ns = null; AcousticEchoCanceler aec = null;
         AtomicBoolean alive = new AtomicBoolean(true);
+        AtomicLong lastSent = new AtomicLong(SystemClock.elapsedRealtime());
+        ScheduledExecutorService watchdog = Executors.newSingleThreadScheduledExecutor();
         ArrayBlockingQueue<Frame> queue = new ArrayBlockingQueue<>(3);
         Thread writer = null, reader = null;
         try {
@@ -139,6 +146,7 @@ public final class MicService extends Service {
                         if (SystemClock.elapsedRealtime() - frame.captured > 120) continue;
                         if (muted) Arrays.fill(frame.pcm, (byte)0);
                         Wire.write(output, Wire.AUDIO, sequence++, frame.pcm);
+                        lastSent.set(SystemClock.elapsedRealtime());
                     }
                 } catch (Exception ignored) { }
                 finally { alive.set(false); try { conn.close(); } catch (IOException ignored) { } }
@@ -153,6 +161,14 @@ public final class MicService extends Service {
                 } catch (Exception ignored) { }
                 finally { alive.set(false); try { conn.close(); } catch (IOException ignored) { } }
             }, "PocketMic-control");
+            // SO_TIMEOUT covers reads, not a blocked write or a reader waiting for the writer lock.
+            // Closing the socket from an independent watchdog breaks both and enables reconnect.
+            watchdog.scheduleAtFixedRate(() -> {
+                if (alive.get() && SystemClock.elapsedRealtime() - lastSent.get() > 5000) {
+                    alive.set(false); try { conn.close(); } catch (IOException ignored) { }
+                    stopRecorder();
+                }
+            }, 1, 1, TimeUnit.SECONDS);
             writer.start(); reader.start();
             short[] samples = new short[Wire.SAMPLES];
             boolean recording = true;
@@ -181,9 +197,10 @@ public final class MicService extends Service {
                 if (!queue.offer(frame)) { queue.poll(); queue.offer(frame); }
             }
         } finally {
-            alive.set(false); conn.close();
-            if (recorder.getRecordingState() == AudioRecord.RECORDSTATE_RECORDING) recorder.stop();
+            alive.set(false); watchdog.shutdownNow(); conn.close();
+            stopRecorder();
             if (ns != null) ns.release(); if (aec != null) aec.release(); recorder.release();
+            if (activeRecorder == recorder) activeRecorder = null;
             if (writer != null) { writer.interrupt(); writer.join(1500); }
             if (reader != null) { reader.interrupt(); reader.join(1500); }
         }
@@ -207,10 +224,14 @@ public final class MicService extends Service {
     }
     private void updateNotification() { if (running && !stopping) getSystemService(NotificationManager.class).notify(1, notification()); }
     private void closeSocket() { Socket current = socket; if (current != null) try { current.close(); } catch (IOException ignored) { } }
+    private void stopRecorder() {
+        AudioRecord current = activeRecorder;
+        if (current != null) try { if (current.getRecordingState() == AudioRecord.RECORDSTATE_RECORDING) current.stop(); } catch (IllegalStateException ignored) { }
+    }
     private void shutdown() {
         stopping = true;
         if (owner == this) { running = false; connected = false; peak = 0; }
-        closeSocket(); if (worker != null) worker.interrupt();
+        closeSocket(); stopRecorder(); if (worker != null) worker.interrupt();
         if (wakeLock != null && wakeLock.isHeld()) wakeLock.release();
         if (wifiLock != null && wifiLock.isHeld()) wifiLock.release();
         stopForeground(STOP_FOREGROUND_REMOVE);
