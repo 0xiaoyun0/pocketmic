@@ -59,8 +59,9 @@ internal static class UpdateService
         Process.Start(start)?.Dispose();
     }
 
-    public static async Task ApplyAsync(string planPath)
+    public static async Task ApplyAsync(string planPath, Action<string>? launch = null)
     {
+        launch ??= path => Process.Start(new ProcessStartInfo(path) { UseShellExecute = true })?.Dispose();
         var full = Path.GetFullPath(planPath);
         if (!full.StartsWith(Path.GetFullPath(Folder) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException("Invalid update staging path.");
         var plan = JsonSerializer.Deserialize<UpdatePlan>(await File.ReadAllTextAsync(full)) ?? throw new InvalidDataException("Invalid update plan.");
@@ -87,12 +88,12 @@ internal static class UpdateService
             File.Copy(plan.Source, next, true);
             File.Move(plan.Target, backup, true); moved = true;
             File.Move(next, plan.Target, true);
-            Process.Start(new ProcessStartInfo(plan.Target) { UseShellExecute = true })?.Dispose();
+            launch(plan.Target);
         }
         catch
         {
             if (moved) File.Copy(backup, plan.Target, true);
-            Process.Start(new ProcessStartInfo(plan.Target) { UseShellExecute = true })?.Dispose();
+            launch(plan.Target);
             throw;
         }
     }

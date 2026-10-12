@@ -8,6 +8,7 @@ The first release is a preview. Automated protocol tests do not establish phone 
 - Android JUnit tests exercise the QR contract, malformed addresses and credentials, duplicate fields, USB loopback, exact network-order headers, oversized frames and truncated audio.
 - Cross-language tests compile **the production Android `Pairing`, `Wire` and `PinnedTls` Java sources** and connect to the production Windows `Receiver` over a real TLS socket. They reject a changed certificate and invalid secret, then send generated PCM audio, return heartbeats, burst the sender, disconnect and reconnect. The receiver verifies nonzero decoded samples and bounded buffering.
 - Android lint checks API-level correctness and app resources. The intentional custom trust-manager lint exception is documented in `android/app/lint.xml`; the trust anchor is a scanned leaf-certificate fingerprint and its fail-closed behavior is tested by interop.
+- Update tests validate numeric versions, fixed repository/asset paths, manifest binding, corrupted download rejection, Windows executable replacement and launch-failure rollback without launching a real app. Driver tests validate official package download, pinned hashes and Authenticode without installing a driver.
 - GitHub Actions rebuilds the Windows portable package and Android debug APK and runs the checks above. Release APK is signed separately with a private maintainer key.
 
 ## Verified locally for v0.1.0
@@ -16,6 +17,7 @@ The first release is a preview. Automated protocol tests do not establish phone 
 - Windows unit/TLS integration tests and Android JVM unit tests run locally.
 - Android APK build and lint run locally.
 - Java-to-Windows TLS audio interop test run locally.
+- Automatic driver download and Authenticode verification run locally. Driver UAC/install/reboot and Android package-install confirmation still require physical-machine acceptance.
 
 No Android handset or VB-CABLE was available on the development machine. **The physical phone → virtual recording device → meeting application chain remains unverified.** No end-to-end latency numbers are claimed.
 
