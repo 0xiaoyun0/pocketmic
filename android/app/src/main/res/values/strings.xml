@@ -1,0 +1,19 @@
+<resources>
+ <string name="update_label">自动检查更新</string>
+ <string name="ui_1">PocketMic</string>
+ <string name="ui_2">PocketMic</string>
+ <string name="ui_3">帮助</string>
+ <string name="ui_4">好声音，\n随你连接。</string>
+ <string name="ui_5">让这部手机，成为电脑的麦克风。</string>
+ <string name="ui_6">麦克风实时音量</string>
+ <string name="ui_7">准备好，让电脑听见你</string>
+ <string name="ui_8">同一 Wi-Fi · 扫码配对 · 一键连接</string>
+ <string name="ui_9">我的电脑</string>
+ <string name="ui_10">还没有配对设备</string>
+ <string name="ui_11">扫描电脑端 PocketMic 的二维码</string>
+ <string name="ui_12">扫码连接电脑</string>
+ <string name="ui_13">重新扫码</string>
+ <string name="ui_14">粘贴配对链接</string>
+ <string name="ui_15">断开</string>
+ <string name="ui_16">局域网加密传输 · 不保存或上传录音</string>
+</resources>

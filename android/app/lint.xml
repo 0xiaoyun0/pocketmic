@@ -1,0 +1,5 @@
+<lint>
+ <!-- Intentional local certificate pinning. The scanned SHA-256 leaf certificate is the trust
+      anchor. Interop tests prove mismatched fingerprints fail before the token is transmitted. -->
+ <issue id="CustomX509TrustManager"><ignore path="src/main/java/app/pocketmic/PinnedTls.java"/></issue>
+</lint>

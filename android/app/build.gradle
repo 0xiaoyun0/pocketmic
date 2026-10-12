@@ -1,0 +1,47 @@
+plugins { id 'com.android.application' }
+def releaseVersion = rootProject.file('../VERSION').text.trim()
+def versionParts = releaseVersion.split('\\.').collect { it.toInteger() }
+
+android {
+    namespace 'app.pocketmic'
+    compileSdk 35
+    buildFeatures { buildConfig true }
+    defaultConfig {
+        applicationId 'app.pocketmic'
+        minSdk 26
+        targetSdk 35
+        versionCode versionParts[0] * 1000000 + versionParts[1] * 1000 + versionParts[2]
+        versionName releaseVersion
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    signingConfigs {
+        release {
+            if (System.getenv('POCKETMIC_KEYSTORE')) {
+                storeFile file(System.getenv('POCKETMIC_KEYSTORE'))
+                storePassword System.getenv('POCKETMIC_STORE_PASSWORD')
+                keyAlias 'pocketmic'
+                keyPassword System.getenv('POCKETMIC_STORE_PASSWORD')
+            }
+        }
+    }
+    buildTypes {
+        release { minifyEnabled false; if (System.getenv('POCKETMIC_KEYSTORE')) signingConfig signingConfigs.release }
+    }
+    testOptions { unitTests.returnDefaultValues = true }
+    sourceSets.main.assets.srcDir layout.buildDirectory.dir('generated/licenseAssets')
+}
+
+tasks.register('copyLicenses', Copy) {
+    from rootProject.file('../licenses')
+    into layout.buildDirectory.dir('generated/licenseAssets/licenses')
+}
+tasks.named('preBuild').configure { dependsOn 'copyLicenses' }
+
+dependencies {
+    implementation 'androidx.core:core:1.13.1'
+    implementation 'com.journeyapps:zxing-android-embedded:4.3.0'
+    testImplementation 'junit:junit:4.13.2'
+}

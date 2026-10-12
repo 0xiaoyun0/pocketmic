@@ -1,0 +1,16 @@
+.tools/
+.artifacts/
+.vs/
+.idea/
+**/bin/
+**/obj/
+**/build/
+**/.gradle/
+**/local.properties
+*.user
+*.pfx
+*.jks
+*.keystore
+*.log
+*.secret
+__pycache__/
